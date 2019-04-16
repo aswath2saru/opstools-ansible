@@ -1,0 +1,49 @@
+---
+
+- name: Fetch overcloud node address
+  delegate_to: undercloud_host
+  shell: >
+    cat $HOME/overcloudrc | grep {{ item.rc_param }} |
+    sed -e 's/export.*=\(.*\)/\1/' | sed -e 's/\s*//'g
+  register: rcdata
+  with_items:
+    - rc_param: OS_AUTH_URL
+      cfg_param: openstack_auth_url
+    - rc_param: OS_USERNAME
+      cfg_param: openstack_username
+    - rc_param: OS_PASSWORD
+      cfg_param: openstack_password
+    - rc_param: OS_TENANT_NAME
+      cfg_param: openstack_tenant_name
+
+- name: Set facts from result data
+  set_fact: {'{{ item.item.cfg_param }}': '{{ item.stdout }}'}
+  with_items:
+    - '{{ rcdata.results }}'
+
+- name: Get the overcloud.ctlplane.localdomain
+  delegate_to: undercloud_host
+  shell: >
+    source ~/stackrc &&
+    openstack stack output show -f shell overcloud HostsEntry |
+    grep overcloud.ctlplane.localdomain | awk '{print $1}' | head -n 1
+  register: controllerip
+
+# yamllint disable rule:line-length
+- name: Get the HA Proxy data on the overcloud node
+  delegate_to: undercloud_host
+  shell: >
+    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
+    heat-admin@{{ controllerip.stdout }}
+    "sudo awk 'BEGIN {PRINT=0;}{if( \$2 == \"haproxy.stats\") {PRINT=1;} else if ( PRINT==1 ) {if (\$1 == \"bind\") URI=\$2; if (\$1 == \"mode\") MODE=\$2;if (\$1 == \"stats\" && \$2 == \"auth\") USER=\$3; if (\$1 == \"listen\" ) { exit }} }END{ print MODE\"://\"URI\"\n\"USER}' /etc/haproxy/haproxy.cfg"
+  register: haproxy_data
+# yamllint enable rule:line-length
+
+- name: Update client configuration on monitoring host
+  template:
+    src: 'templates/client.json.j2'
+    dest: '{{ sensu_config_path }}/client.json'
+    owner: '{{ sensu_owner }}'
+    group: '{{ sensu_group }}'
+  notify:
+    - restart sensu client service

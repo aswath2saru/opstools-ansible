@@ -1,0 +1,52 @@
+---
+# Uchiwa package name.
+uchiwa_package_name: uchiwa
+
+# Uchiwa service name.
+uchiwa_service_name: uchiwa
+uchiwa_extra_groups:
+  - sensu
+
+# Address on which Uchiwa should listen for connections.
+uchiwa_bind: 127.0.0.1
+
+# Address to which clients should connect to Uchiwa.
+uchiwa_server_address: localhost
+
+# Port on which Uchiwa should listen.
+uchiwa_port: 3000
+
+# How often Uchiwa should refresh results.
+uchiwa_refresh: 5
+
+# Path to Uchiwa configuration file.
+uchiwa_file_path: /etc/sensu/uchiwa.json
+
+uchiwa_sensu_api_server_name: uchiwa
+
+# List of Sensu datacenters to which Uchiwa should connect.
+# Provide a dynamic default which will provide API authentication if
+# sensu_api_authentication is enabled.
+sensu_datacenters: >
+  {%- set datacenter = {
+    "name": uchiwa_sensu_api_server_name,
+    "host": sensu_api_server,
+    "port": sensu_api_port
+  } -%}
+  {%- if sensu_api_authentication | bool %}
+  {%- set _ = datacenter.update({"user": sensu_api_username}) %}
+  {%- set _ = datacenter.update({"pass": sensu_api_password}) %}
+  {%- endif -%}
+  {{ [ datacenter ] }}
+
+# Authentication method, can be:
+# 'htpasswd': htpasswd auth by the proxy to access uchiwa
+# 'uchiwa': uchiwa's built-in login mechanism, allows to read-only users
+uchiwa_authentication: 'htpasswd'
+
+# Note: the 'readonly' parameter is only effective when using
+# uchiwa_authentication: 'uchiwa'
+uchiwa_credentials:
+  - username: 'operator'
+    password: 'changeme'
+    readonly: 'false'

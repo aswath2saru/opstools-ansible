@@ -1,0 +1,10 @@
+uspllosplog01 ansible_host=uspllosplog01  ansible_user=root ansible_become=true
+
+[am_hosts]
+uspllosplog01
+
+[logging_hosts]
+uspllosplog01
+
+[pm_hosts]
+uspllosplog01

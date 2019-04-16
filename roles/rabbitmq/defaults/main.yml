@@ -1,0 +1,59 @@
+---
+# Port on which RabbitMQ should listen.
+rabbitmq_port: 5672
+
+# Address to which clients should connect to the RabbitMQ service.
+rabbitmq_server: localhost
+
+# Addresses on which RabbitMQ should listen for connections.
+rabbitmq_interface:
+  - "::"
+
+# RabbitMQ package name.
+rabbitmq_package_name: rabbitmq-server
+
+# RabbitMQ service name.
+rabbitmq_service_name: rabbitmq-server
+
+# Default RabbitMQ user.
+rabbitmq_default_user: guest
+
+# Path to RabbitMQ configuration file.
+rabbitmq_config_file: /etc/rabbitmq/rabbitmq.config
+
+# Owner of RabbitMQ configuration files.
+rabbitmq_config_owner: rabbitmq
+
+# Group of RabbitMQ configuration files.
+rabbitmq_config_group: rabbitmq
+
+# Mode of RabbitMQ configuration files.
+rabbitmq_config_mode: "0644"
+
+# Enable SSL connections
+rabbitmq_use_ssl: false
+
+# Content of CA certificate to be created on RabbitMQ server node.
+rabbitmq_ssl_cacert:
+
+# Content of server certificate to be created on RabbitMQ server node.
+rabbitmq_ssl_cert:
+
+# Content of server key to be created on RabbitMQ server node.
+rabbitmq_ssl_key:
+
+# Path to where certificates/key should be created on server node.
+rabbitmq_ssl_certs_path: '/etc/rabbitmq/ssl'
+
+# Port on which RabbitMQ should listen on for SSL connections.
+rabbitmq_ssl_port: 5671
+
+# Fail for clients without a certificate to send to the RabbitMQ server.
+rabbitmq_ssl_fail_no_cert: 'false'
+
+# Valid values are:
+#     verify_peer - ensure a chain of trust is established when the client sends
+#                   a certificate
+#     verify_none - no certificate exchange takes place from the client
+#                   to the server
+rabbitmq_ssl_verify: verify_peer

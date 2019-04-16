@@ -1,0 +1,9 @@
+grafana_username: admin
+grafana_password: passw0rd
+uchiwa_credentials:
+  - username: 'admin'
+    password: 'passw0rd'
+kibana_credentials:
+  - username: 'admin'
+    password: 'passw0rd'
+data_storage: graphite

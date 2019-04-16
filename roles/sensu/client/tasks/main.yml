@@ -1,0 +1,64 @@
+---
+
+# Add the following configuration
+# client.json -- it configures the sensu-client
+- name: Configure sensu client
+  template:
+    src: 'templates/{{ item }}.json.j2'
+    dest: '{{sensu_config_path}}/{{ item }}.json'
+    owner: '{{ sensu_owner }}'
+    group: '{{ sensu_group }}'
+  with_items:
+    - client
+  notify:
+    - restart sensu client services
+
+# This is a workaround for https://github.com/sensu/sensu/issues/1478
+- name: Ensure correct ownership on directories
+  file:
+    path: '{{ item }}'
+    state: directory
+    owner: '{{ sensu_owner }}'
+    group: '{{ sensu_group }}'
+    recurse: true
+  with_items:
+    - '{{ sensu_log_path }}'
+    - '{{ sensu_runtime_path }}'
+  notify:
+    - restart sensu client services
+
+# Ensure that the python-requests module is installed (required for HAProxy
+# stats check and check-docker-health handler)
+- name: Install python-request-package
+  package:
+    name: '{{ python_requests_package_name }}'
+    state: present
+  when: manage_packages|default(false)
+
+- name: Copy the HAProxy check script
+  copy:
+    src: sensu-haproxy-check.py
+    dest: '{{ sensu_plugin_path }}/sensu-haproxy-check.py'
+    owner: '{{ sensu_owner }}'
+    group: '{{ sensu_group }}'
+    mode: 0740
+  when: sensu_manage_checks_haproxy|default(false)
+  notify:
+    - restart sensu client services
+
+- name: Ensure sensu-client is started and enabled at boot
+  service:
+    name: '{{ item }}'
+    state: started
+    enabled: yes
+  with_items:
+    - '{{ sensu_client_service_name }}'
+  when: manage_services|default(false)
+
+- name: Install oschecks package
+  package:
+    name: '{{ oschecks_package_name }}'
+    state: present
+  when:
+    - manage_packages|default(false)
+    - sensu_manage_checks_oschecks|default(false)

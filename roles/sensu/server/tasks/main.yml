@@ -1,0 +1,102 @@
+---
+
+# Add the following configuration
+# api.json -- it configures the sensu-api (server and client)
+# redis.json -- it configures the use of redis for sensu as storage
+- name: Configure sensu
+  template:
+    src: 'templates/{{ item }}.json.j2'
+    dest: '{{sensu_config_path}}/{{ item }}.json'
+    owner: '{{ sensu_owner }}'
+    group: '{{ sensu_group }}'
+  with_items:
+    - api
+    - redis
+  notify:
+    - restart sensu server services
+
+# sensu-checks.json configures oschecks to be executed on the clients.
+# It's provided by the sensu-checks.json.j2 template which can be customized
+# through the sensu_overcloud_checks and sensu_remote_checks variables.
+- name: Configure sensu checks
+  template:
+    src: 'templates/sensu-checks.json.j2'
+    dest: '{{sensu_config_path}}/sensu-checks.json'
+    owner: '{{ sensu_owner }}'
+    group: '{{ sensu_group }}'
+  when: sensu_manage_checks
+  notify:
+    - restart sensu server services
+
+- name: Copy the handler script for check-docker-health check
+  copy:
+    src: handle-docker-health.py
+    dest: '{{ sensu_plugin_path }}/handle-docker-health.py'
+    owner: '{{ sensu_owner }}'
+    group: '{{ sensu_group }}'
+    mode: 0740
+  when: sensu_manage_handlers
+
+- name: Configure sensu handlers
+  template:
+    src: 'templates/{{ item }}.json.j2'
+    dest: '{{sensu_config_path}}/{{ item }}.json'
+    owner: '{{ sensu_owner }}'
+    group: '{{ sensu_group }}'
+  with_items:
+    - sensu-handler-container
+  when: sensu_manage_handlers
+  notify:
+    - restart sensu server services
+
+- name: Create sensu vhost on rabbitmq
+  delegate_to: "{{ item }}"
+  rabbitmq_vhost:
+    name: '{{ sensu_rabbitmq_vhost }}'
+    state: present
+  notify:
+    - restart rabbitmq
+  with_items: "{{ groups.rabbit_hosts }}"
+
+- name: Configure rabbitmq permissions
+  delegate_to: "{{ item }}"
+  rabbitmq_user:
+    user: '{{ sensu_rabbitmq_user }}'
+    password: '{{ sensu_rabbitmq_password }}'
+    vhost: '{{ sensu_rabbitmq_vhost }}'
+    configure_priv: '.*'
+    read_priv: '.*'
+    write_priv: '.*'
+  notify:
+    - restart rabbitmq
+  with_items: "{{ groups.rabbit_hosts }}"
+
+# This is a workaround for https://github.com/sensu/sensu/issues/1478
+- name: Ensure correct ownership on directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: '{{ sensu_owner }}'
+    group: '{{ sensu_group }}'
+    recurse: true
+  with_items:
+    - '{{ sensu_log_path }}'
+    - '{{ sensu_runtime_path }}'
+  notify:
+    - restart sensu server services
+
+- name: Ensure sensu is started and enabled at boot
+  service:
+    name: '{{ item }}'
+    state: started
+    enabled: yes
+  with_items:
+    - '{{ sensu_server_service_name }}'
+    - '{{ sensu_api_service_name }}'
+  when: manage_services|default(false)
+
+- name: Create appropriate firewall rules
+  include_role:
+    name: firewall/commit
+  vars:
+    firewall_rules: sensu_hosts

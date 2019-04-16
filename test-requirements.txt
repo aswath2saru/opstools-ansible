@@ -1,0 +1,7 @@
+ansible-lint
+flake8
+hacking
+pep8
+setuptools>=11.3
+yamllint
+sphinx

@@ -1,0 +1,69 @@
+---
+- name: Enable Sensu repository
+  copy:
+    src: sensu.repo
+    dest: '{{ yum_repos_d }}/sensu.repo'
+  when: manage_repos|default(false)
+
+- name: Ensure repoquery command is available
+  package:
+    name: yum-utils
+    state: present
+  when: manage_packages|default(false)
+
+- name: Check for obsolete sensu package
+  command: >
+    repoquery --installed --whatprovides
+    '{{ sensu_package_name }} <= {{ sensu_minimum_version }}'
+  changed_when: false
+  failed_when: false
+  register: sensu_version
+  when: manage_packages|default(false)
+
+- name: Remove obsolete sensu package
+  package:
+    name: '{{ item }}'
+    state: absent
+  with_items: '{{ sensu_version.stdout_lines }}'
+  when: manage_packages|default(false)
+
+- name: Install sensu
+  package:
+    name: '{{ sensu_package_name }}'
+    state: installed
+  when: manage_packages|default(false)
+
+- name: Configure rabbitmq on sensu
+  template:
+    src: templates/{{ item }}.json.j2
+    dest: '{{ sensu_config_path }}/{{ item }}.json'
+    owner: '{{ sensu_owner }}'
+    group: '{{ sensu_group }}'
+  with_items:
+    - rabbitmq
+
+- block:
+    - name: Ensure SSL directory for Sensu exists
+      file:
+        path: '{{ sensu_rabbitmq_ssl_certs_path }}'
+        owner: '{{ sensu_owner }}'
+        group: '{{ sensu_group }}'
+        mode: '0700'
+        state: directory
+
+    - name: Install sensu client key
+      copy:
+        content: '{{ sensu_rabbitmq_ssl_key }}'
+        dest: '{{ sensu_rabbitmq_ssl_certs_path }}/key.pem'
+        owner: '{{ sensu_owner }}'
+        group: '{{ sensu_group }}'
+        mode: '0400'
+
+    - name: Install sensu client certificate
+      copy:
+        content: '{{ sensu_rabbitmq_ssl_cert }}'
+        dest: '{{ sensu_rabbitmq_ssl_certs_path }}/cert.pem'
+        owner: '{{ sensu_owner }}'
+        group: '{{ sensu_group }}'
+        mode: '0400'
+  when: sensu_rabbitmq_with_ssl

@@ -1,0 +1,31 @@
+---
+- name: Install uchiwa configuration for Apache
+  template:
+    src: uchiwa.conf.j2
+    dest: '{{ uchiwa_httpd_conf }}'
+  notify: restart httpd
+
+- when: uchiwa_authentication == 'htpasswd'
+  block:
+    - name: Ensure uchiwa htpasswd file exists
+      file:
+        path: "{{ uchiwa_proxy_htpasswd }}"
+        state: "touch"
+        owner: apache
+        group: apache
+        mode: 0640
+
+    - name: Generate uchiwa htpasswd credentials
+      command: >
+        htpasswd -b {{ uchiwa_proxy_htpasswd }} \
+        {{ item['username'] }} {{ item['password'] }}
+      with_items: "{{ uchiwa_credentials }}"
+      no_log: true
+
+- name: Configure default redirect
+  copy:
+    content: |
+      RewriteRule ^/$ {{ uchiwa_path }} [R=302]
+    dest: '{{ opstools_default_redirect_file }}'
+    force: false
+  notify: restart httpd

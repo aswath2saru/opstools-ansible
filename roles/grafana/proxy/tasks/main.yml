@@ -1,0 +1,66 @@
+---
+- name: Install grafana configuration for Apache
+  template:
+    src: grafana.conf.j2
+    dest: '{{ grafana_httpd_conf }}'
+  notify: restart httpd
+
+- name: Configure default redirect
+  copy:
+    content: |
+      RewriteRule ^/$ {{ grafana_path }} [R=302]
+    dest: '{{ opstools_default_redirect_file }}'
+    force: false
+  notify: restart httpd
+
+- name: check if http was really restarted
+  uri:
+    method: GET
+    url: 'https://{{grafana_server_address}}{{grafana_path}}'
+    validate_certs: no
+    status_code: 200,404
+  register: httpd_restart
+
+- name: force restart httpd
+  service:
+    name: httpd
+    state: stopped
+  when: httpd_restart.status == 404
+
+- name: force start httpd
+  service:
+    name: httpd
+    state: started
+  when: httpd_restart.status == 404
+
+- name: wait for grafana to be started
+  wait_for:
+    host: '127.0.0.1'
+    port: '{{ grafana_port }}'
+    delay: 5
+    timeout: 120
+  ignore_errors: yes
+
+- name: check if datasource added
+  uri:
+    method: GET
+    header: 'Content-Type: application/json'
+    username: '{{ grafana_username }}'
+    password: '{{ grafana_password }}'
+    url: '{{gauth}}{{gurl}}/'
+    validate_certs: no
+    force_basic_auth: yes
+  register: datasource_added
+  ignore_errors: yes
+
+- name: create data source for grafana server
+  uri:
+    method: POST
+    header: 'Content-Type: application/json'
+    body: "{{ lookup('template', 'data_source.json.j2') |to_json }}"
+    body_format: json
+    url: '{{gauth}}{{gurl}}'
+    username: '{{ grafana_username }}'
+    password: '{{ grafana_password }}'
+    validate_certs: no
+    force_basic_auth: yes
